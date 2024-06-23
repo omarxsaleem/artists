@@ -2,6 +2,7 @@ package main
 
 import (
 	"example/web-service-gin/album"
+	"example/web-service-gin/artist"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -15,10 +16,11 @@ func main() {
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 
-	// Initialize the album service
+	// Initialize the services
 	albumService := album.NewInMemoryAlbumService()
+	artistService := artist.NewInMemoryArtistService()
 
-	// Routes
+	// Album routes
 	e.GET("/albums", func(c echo.Context) error {
 		albums, err := albumService.GetAlbums()
 		if err != nil {
@@ -45,6 +47,53 @@ func main() {
 			return c.JSON(http.StatusInternalServerError, err)
 		}
 		return c.JSON(http.StatusCreated, newAlbum)
+	})
+
+	// Artist routes
+	e.GET("/artists", func(c echo.Context) error {
+		artists, err := artistService.GetArtists()
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, err)
+		}
+		return c.JSON(http.StatusOK, artists)
+	})
+
+	e.GET("/artists/:id", func(c echo.Context) error {
+		id := c.Param("id")
+		artist, err := artistService.GetArtistByID(id)
+		if err != nil {
+			return c.JSON(http.StatusNotFound, map[string]string{"message": "artist not found"})
+		}
+		return c.JSON(http.StatusOK, artist)
+	})
+
+	e.POST("/artists", func(c echo.Context) error {
+		var newArtist artist.Artist
+		if err := c.Bind(&newArtist); err != nil {
+			return err
+		}
+		if err := artistService.AddArtist(newArtist); err != nil {
+			return c.JSON(http.StatusInternalServerError, err)
+		}
+		return c.JSON(http.StatusCreated, newArtist)
+	})
+
+	// Get all albums by artist ID
+	e.GET("/albums/artist/:artist_id", func(c echo.Context) error {
+		artistID := c.Param("artist_id")
+		allAlbums, err := albumService.GetAlbums()
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, err)
+		}
+
+		var albumsByArtist []album.Album
+		for _, a := range allAlbums {
+			if a.ArtistID == artistID {
+				albumsByArtist = append(albumsByArtist, a)
+			}
+		}
+
+		return c.JSON(http.StatusOK, albumsByArtist)
 	})
 
 	// Start server
